@@ -7,6 +7,7 @@ constructor_args:
   - cmd: '@cmd'
   - host_euler_topic_name: "target_eulr"
   - host_chassis_data_topic_name: "host_chassis_data"
+  - host_fire_topic_name: "host_fire_notify"
 template_args: []
 required_hardware: []
 depends: []
