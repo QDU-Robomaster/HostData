@@ -14,8 +14,6 @@ depends: []
 === END MANIFEST === */
 // clang-format on
 
-#include <sys/_intsup.h>
-
 #include "CMD.hpp"
 #include "app_framework.hpp"
 #include "libxr_cb.hpp"
