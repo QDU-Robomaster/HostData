@@ -13,10 +13,16 @@ depends: []
 === END MANIFEST === */
 // clang-format on
 
+#include <sys/_intsup.h>
+
 #include "CMD.hpp"
 #include "app_framework.hpp"
+#include "libxr_cb.hpp"
 #include "libxr_def.hpp"
+#include "libxr_type.hpp"
+#include "logger.hpp"
 #include "message.hpp"
+#include "transform.hpp"
 
 class HostData : public LibXR::Application {
  public:
@@ -32,16 +38,23 @@ class HostData : public LibXR::Application {
     float w;
   };
 
+  enum class HostFireNotify : uint8_t {
+    FIRE_STOP = 0,
+    FIRE_START,
+  };
+
   HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
            CMD& cmd, const char* host_euler_topic_name,
-           const char* host_chassis_data_topic_name)
+           const char* host_chassis_data_topic_name,
+           const char* host_fire_topic_name)
       : cmd_(&cmd),
-        host_euler_data_tp_(LibXR::Topic::CreateTopic<HostGimbalEuler>(
-            host_euler_topic_name)),
+        host_euler_data_tp_(
+            LibXR::Topic::CreateTopic<HostGimbalEuler>(host_euler_topic_name)),
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
-        ai_cmd_tp_("ai_cmd",sizeof(CMD::Data))
-  {
+        host_fire_notify_tp_(
+            LibXR::Topic::CreateTopic<HostFireNotify>(host_fire_topic_name)),
+        ai_cmd_tp_("ai_cmd", sizeof(CMD::Data)) {
     UNUSED(hw);
     UNUSED(app);
 
@@ -50,28 +63,32 @@ class HostData : public LibXR::Application {
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           UNUSED(in_isr);
-          HostGimbalEuler& euler =
-              *static_cast<HostGimbalEuler*>(raw_data.addr_);
-          host_data->host_euler_data_ = euler;
-          host_data->HostCMD();
+          LibXR::Memory::FastCopy(&host_data->host_euler_data_,
+                                  raw_data.addr_, sizeof(HostGimbalEuler));
         },
         this);
 
     auto chassis_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           UNUSED(in_isr);
-          HostChassisTarget& chassis =
-              *static_cast<HostChassisTarget*>(raw_data.addr_);
-          host_data->host_chassis_data_ = chassis;
+          LibXR::Memory::FastCopy(&host_data->host_chassis_data_,
+                                  raw_data.addr_, sizeof(HostChassisTarget));
           host_data->HostCMD();
         },
         this);
 
+    auto fire_callback = LibXR::Callback<LibXR::RawData&>::Create(
+        [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
+          UNUSED(in_isr);
+          LibXR::Memory::FastCopy(&host_data->host_fire_notify_,raw_data.addr_, sizeof(HostFireNotify));
+        },
+        this);
     host_euler_data_tp_.RegisterCallback(euler_callback);
     host_chassis_data_tp_.RegisterCallback(chassis_callback);
+    host_fire_notify_tp_.RegisterCallback(fire_callback);
   }
 
-  void HostCMD(){
+  void HostCMD() {
     CMD::Data host_cmd;
 
     host_cmd.chassis.x = host_chassis_data_.vx;
@@ -91,8 +108,10 @@ class HostData : public LibXR::Application {
   CMD* cmd_;
   HostChassisTarget host_chassis_data_;
   HostGimbalEuler host_euler_data_;
+  HostFireNotify host_fire_notify_;
 
   LibXR::Topic host_euler_data_tp_;
   LibXR::Topic host_chassis_data_tp_;
+  LibXR::Topic host_fire_notify_tp_;
   LibXR::Topic ai_cmd_tp_;
 };
