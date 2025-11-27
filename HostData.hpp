@@ -18,13 +18,18 @@ depends: []
 #include "app_framework.hpp"
 #include "libxr_cb.hpp"
 #include "libxr_def.hpp"
+#include "libxr_time.hpp"
 #include "libxr_type.hpp"
 #include "logger.hpp"
 #include "message.hpp"
+#include "semaphore.hpp"
+#include "timebase.hpp"
 #include "transform.hpp"
 
 class HostData : public LibXR::Application {
  public:
+  static constexpr uint32_t DATA_TIMEOUT_MS = 200;
+
   struct HostGimbalEuler {
     float pitch;
     float roll;
@@ -37,9 +42,8 @@ class HostData : public LibXR::Application {
     float w;
   };
 
-  enum class HostFireNotify : uint8_t {
-    FIRE_STOP = 0,
-    FIRE_START,
+  struct LauncherCMD {
+    bool isfire;
   };
 
   HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
@@ -52,7 +56,7 @@ class HostData : public LibXR::Application {
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
         host_fire_notify_tp_(
-            LibXR::Topic::CreateTopic<HostFireNotify>(host_fire_topic_name)),
+            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)),
         ai_cmd_tp_("ai_cmd", sizeof(CMD::Data)) {
     UNUSED(hw);
     UNUSED(app);
@@ -62,16 +66,18 @@ class HostData : public LibXR::Application {
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           UNUSED(in_isr);
-          LibXR::Memory::FastCopy(&host_data->host_euler_data_,
-                                  raw_data.addr_, sizeof(HostGimbalEuler));
+          LibXR::Memory::FastCopy(&host_data->host_euler_data_, raw_data.addr_,
+                                  sizeof(HostGimbalEuler));
+          host_data->sem_gimbal_.PostFromCallback(in_isr);
+          host_data->HostCMD();
         },
         this);
 
     auto chassis_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
-          UNUSED(in_isr);
           LibXR::Memory::FastCopy(&host_data->host_chassis_data_,
                                   raw_data.addr_, sizeof(HostChassisTarget));
+          host_data->sem_chassis_.PostFromCallback(in_isr);
           host_data->HostCMD();
         },
         this);
@@ -79,7 +85,10 @@ class HostData : public LibXR::Application {
     auto fire_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           UNUSED(in_isr);
-          LibXR::Memory::FastCopy(&host_data->host_fire_notify_,raw_data.addr_, sizeof(HostFireNotify));
+          LibXR::Memory::FastCopy(&host_data->host_fire_notify_, raw_data.addr_,
+                                  sizeof(LauncherCMD));
+          host_data->sem_fire_.PostFromCallback(in_isr);
+          host_data->HostCMD();
         },
         this);
     host_euler_data_tp_.RegisterCallback(euler_callback);
@@ -89,13 +98,30 @@ class HostData : public LibXR::Application {
 
   void HostCMD() {
     CMD::Data host_cmd;
+    if (sem_chassis_.Wait(20) == ErrorCode::OK) {
+      host_cmd.chassis.x = host_chassis_data_.vx;
+      host_cmd.chassis.y = host_chassis_data_.vy;
+      host_cmd.chassis.z = host_chassis_data_.w;
+      host_cmd.chassis_online = true;
+    } else {
+      host_cmd.chassis = {0, 0, 0};
+      host_cmd.chassis_online = false;
+    }
 
-    host_cmd.chassis.x = host_chassis_data_.vx;
-    host_cmd.chassis.y = host_chassis_data_.vy;
-    host_cmd.chassis.z = host_chassis_data_.w;
+    if (sem_gimbal_.Wait(20) == ErrorCode::OK) {
+      host_cmd.gimbal.pit = host_euler_data_.pitch;
+      host_cmd.gimbal.yaw = host_euler_data_.yaw;
+      host_cmd.gimbal_online = true;
+    } else {
+      host_cmd.gimbal = {0, 0, 0};
+      host_cmd.gimbal_online = false;
+    }
 
-    host_cmd.gimbal.pit = host_euler_data_.pitch;
-    host_cmd.gimbal.yaw = host_euler_data_.yaw;
+    if (sem_fire_.Wait(20) == ErrorCode::OK) {
+      host_cmd.launcher.isfire = true;
+    } else {
+      host_cmd.launcher.isfire = false;
+    }
 
     host_cmd.ctrl_source = CMD::ControlSource::CTRL_SOURCE_AI;
     ai_cmd_tp_.Publish(host_cmd);
@@ -107,10 +133,14 @@ class HostData : public LibXR::Application {
   CMD* cmd_;
   HostChassisTarget host_chassis_data_;
   HostGimbalEuler host_euler_data_;
-  HostFireNotify host_fire_notify_;
+  LauncherCMD host_fire_notify_;
 
   LibXR::Topic host_euler_data_tp_;
   LibXR::Topic host_chassis_data_tp_;
   LibXR::Topic host_fire_notify_tp_;
   LibXR::Topic ai_cmd_tp_;
+
+  LibXR::Semaphore sem_chassis_;
+  LibXR::Semaphore sem_gimbal_;
+  LibXR::Semaphore sem_fire_;
 };
