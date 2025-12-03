@@ -52,15 +52,11 @@ class HostData : public LibXR::Application {
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
         host_fire_notify_tp_(
-            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)),
-        ai_cmd_tp_("ai_cmd", sizeof(CMD::Data)) {
+          LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
     UNUSED(hw);
-
-    cmd_->RegisterController<CMD::Data>(ai_cmd_tp_);
 
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
-          UNUSED(in_isr);
           LibXR::Memory::FastCopy(&host_data->host_euler_, raw_data.addr_,
                                   sizeof(host_data->host_euler_));
           host_data->last_gimbal_time_ = LibXR::Timebase::GetMilliseconds();
@@ -70,7 +66,6 @@ class HostData : public LibXR::Application {
 
     auto chassis_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
-          UNUSED(in_isr);
           LibXR::Memory::FastCopy(&host_data->host_chassis_data_,
                                   raw_data.addr_, sizeof(HostChassisTarget));
           host_data->last_chassis_time_ = LibXR::Timebase::GetMilliseconds();
@@ -80,7 +75,6 @@ class HostData : public LibXR::Application {
 
     auto fire_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
-          UNUSED(in_isr);
           LibXR::Memory::FastCopy(&host_data->host_fire_notify_, raw_data.addr_,
                                   sizeof(LauncherCMD));
           host_data->last_fire_time_ = LibXR::Timebase::GetMilliseconds();
@@ -93,6 +87,7 @@ class HostData : public LibXR::Application {
     app.Register(*this);
   }
   void HostCMD(bool in_isr) {
+    UNUSED(in_isr);
     CMD::Data host_cmd;
 
     if (host_chassis_data_.vx == 0.0f && host_chassis_data_.vy == 0.0f &&
@@ -118,7 +113,7 @@ class HostData : public LibXR::Application {
     host_cmd.launcher.isfire = host_fire_notify_.isfire;
 
     host_cmd.ctrl_source = CMD::ControlSource::CTRL_SOURCE_AI;
-    ai_cmd_tp_.PublishFromCallback(host_cmd, in_isr);
+    cmd_->FeedAI(host_cmd);
   }
 
   void OnMonitor() override {}
@@ -133,7 +128,6 @@ class HostData : public LibXR::Application {
   LibXR::Topic host_euler_data_tp_;
   LibXR::Topic host_chassis_data_tp_;
   LibXR::Topic host_fire_notify_tp_;
-  LibXR::Topic ai_cmd_tp_;
 
   LibXR::MillisecondTimestamp last_chassis_time_ = 0;
   LibXR::MillisecondTimestamp last_gimbal_time_ = 0;
