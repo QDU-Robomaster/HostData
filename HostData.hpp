@@ -28,6 +28,10 @@ depends: []
 #include "timebase.hpp"
 #include "transform.hpp"
 
+/**
+ * @brief 上位机数据接入模块
+ * @details 将上位机发送的云台、底盘、发射命令转换为 CMD::Data 并喂给 CMD 模块。
+ */
 class HostData : public LibXR::Application {
  public:
   static constexpr uint32_t DATA_TIMEOUT_MS = 200;
@@ -42,6 +46,15 @@ class HostData : public LibXR::Application {
     bool isfire;
   };
 
+  /**
+   * @brief 构造 HostData 模块
+   * @param hw 硬件容器
+   * @param app 应用管理器
+   * @param cmd CMD 模块引用
+   * @param host_euler_topic_name 云台目标欧拉角 Topic
+   * @param host_chassis_data_topic_name 底盘目标速度 Topic
+   * @param host_fire_topic_name 发射控制 Topic
+   */
   HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
            CMD& cmd, const char* host_euler_topic_name,
            const char* host_chassis_data_topic_name,
@@ -86,6 +99,11 @@ class HostData : public LibXR::Application {
     host_fire_notify_tp_.RegisterCallback(fire_callback);
     app.Register(*this);
   }
+
+  /**
+   * @brief 汇总并下发 Host 命令
+   * @param in_isr 是否在中断上下文（当前未使用）
+   */
   void HostCMD(bool in_isr) {
     UNUSED(in_isr);
     CMD::Data host_cmd;
@@ -116,6 +134,9 @@ class HostData : public LibXR::Application {
     cmd_->FeedAI(host_cmd);
   }
 
+  /**
+   * @brief 监控回调
+   */
   void OnMonitor() override {}
 
  private:
