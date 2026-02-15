@@ -52,7 +52,7 @@ class HostData : public LibXR::Application {
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
         host_fire_notify_tp_(
-          LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
+            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
     UNUSED(hw);
 
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
@@ -101,7 +101,7 @@ class HostData : public LibXR::Application {
       host_cmd.chassis_online = true;
     }
 
-    if (host_euler_.Pitch() == 0.0f && host_euler_.Yaw()  == 0.0f) {
+    if (host_euler_.Pitch() == 0.0f && host_euler_.Yaw() == 0.0f) {
       host_cmd.gimbal = {0, 0, 0};
       host_cmd.gimbal_online = false;
     } else {
