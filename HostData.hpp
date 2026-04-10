@@ -34,7 +34,6 @@ depends: []
  */
 class HostData : public LibXR::Application {
  public:
-  static constexpr uint32_t DATA_TIMEOUT_MS = 200;
 
   struct HostChassisTarget {
     float vx;
@@ -44,6 +43,12 @@ class HostData : public LibXR::Application {
 
   struct LauncherCMD {
     bool isfire;
+  };
+
+  struct HostGimbalTarget {
+    float rol, pit, yaw;
+    float rol_dot, pit_dot, yaw_dot;
+    float rol_ddot, pit_ddot, yaw_ddot;
   };
 
   /**
@@ -56,22 +61,26 @@ class HostData : public LibXR::Application {
    * @param host_fire_topic_name 发射控制 Topic
    */
   HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
-           CMD& cmd, const char* host_euler_topic_name,
+           CMD& cmd, const char* host_gimbal_topic_name,
            const char* host_chassis_data_topic_name,
            const char* host_fire_topic_name)
       : cmd_(&cmd),
-        host_euler_data_tp_(LibXR::Topic::CreateTopic<LibXR::EulerAngle<float>>(
-            host_euler_topic_name)),
+        host_gimbal_data_tp_(LibXR::Topic::CreateTopic<HostGimbalTarget>(
+            host_gimbal_topic_name)),
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
         host_fire_notify_tp_(
-            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
+            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name))
+ {
     UNUSED(hw);
 
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
-          LibXR::Memory::FastCopy(&host_data->host_euler_, raw_data.addr_,
-                                  sizeof(host_data->host_euler_));
+          HostGimbalTarget t;
+          LibXR::Memory::FastCopy(&t, raw_data.addr_, sizeof(t));
+          host_data->host_euler_ = LibXR::EulerAngle<float>(t.rol, t.pit, t.yaw);
+          host_data->host_gyro_ = Eigen::Matrix<float, 3, 1>(t.rol_dot, t.pit_dot, t.yaw_dot);
+          host_data->host_accl_ = Eigen::Matrix<float, 3, 1>(t.rol_ddot, t.pit_ddot, t.yaw_ddot);
           host_data->last_gimbal_time_ = LibXR::Timebase::GetMilliseconds();
           host_data->HostCMD(in_isr);
         },
@@ -94,9 +103,11 @@ class HostData : public LibXR::Application {
           host_data->HostCMD(in_isr);
         },
         this);
-    host_euler_data_tp_.RegisterCallback(euler_callback);
+
+    host_gimbal_data_tp_.RegisterCallback(euler_callback);
     host_chassis_data_tp_.RegisterCallback(chassis_callback);
     host_fire_notify_tp_.RegisterCallback(fire_callback);
+
     app.Register(*this);
   }
 
@@ -120,12 +131,17 @@ class HostData : public LibXR::Application {
     }
 
     if (host_euler_.Pitch() == 0.0f && host_euler_.Yaw() == 0.0f) {
-      host_cmd.gimbal = {0, 0, 0};
+      host_cmd.gimbal = {0, 0, 0, 0, 0, 0, 0, 0, 0};
       host_cmd.gimbal_online = false;
     } else {
       host_cmd.gimbal.pit = host_euler_.Pitch();
       host_cmd.gimbal.yaw = host_euler_.Yaw();
+      host_cmd.gimbal.pit_dot = host_gyro_.y();
+      host_cmd.gimbal.pit_ddot = host_accl_.y();
+      host_cmd.gimbal.yaw_dot = host_gyro_.z();
+      host_cmd.gimbal.yaw_ddot = host_accl_.z();
       host_cmd.gimbal_online = true;
+
     }
 
     host_cmd.launcher.isfire = host_fire_notify_.isfire;
@@ -145,12 +161,15 @@ class HostData : public LibXR::Application {
   LauncherCMD host_fire_notify_;
 
   LibXR::EulerAngle<float> host_euler_;
+  Eigen::Matrix<float, 3, 1> host_gyro_ = {0,0,0};
+  Eigen::Matrix<float, 3, 1> host_accl_ = {0,0,0};
 
-  LibXR::Topic host_euler_data_tp_;
+  LibXR::Topic host_gimbal_data_tp_;
   LibXR::Topic host_chassis_data_tp_;
   LibXR::Topic host_fire_notify_tp_;
 
   LibXR::MillisecondTimestamp last_chassis_time_ = 0;
   LibXR::MillisecondTimestamp last_gimbal_time_ = 0;
   LibXR::MillisecondTimestamp last_fire_time_ = 0;
+
 };
