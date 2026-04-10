@@ -34,7 +34,6 @@ depends: []
  */
 class HostData : public LibXR::Application {
  public:
-
   struct HostChassisTarget {
     float vx;
     float vy;
@@ -70,17 +69,19 @@ class HostData : public LibXR::Application {
         host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
             host_chassis_data_topic_name)),
         host_fire_notify_tp_(
-            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name))
- {
+            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
     UNUSED(hw);
 
     auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           HostGimbalTarget t;
           LibXR::Memory::FastCopy(&t, raw_data.addr_, sizeof(t));
-          host_data->host_euler_ = LibXR::EulerAngle<float>(t.rol, t.pit, t.yaw);
-          host_data->host_gyro_ = Eigen::Matrix<float, 3, 1>(t.rol_dot, t.pit_dot, t.yaw_dot);
-          host_data->host_accl_ = Eigen::Matrix<float, 3, 1>(t.rol_ddot, t.pit_ddot, t.yaw_ddot);
+          host_data->host_euler_ =
+              LibXR::EulerAngle<float>(t.rol, t.pit, t.yaw);
+          host_data->host_gyro_ =
+              Eigen::Matrix<float, 3, 1>(t.rol_dot, t.pit_dot, t.yaw_dot);
+          host_data->host_accl_ =
+              Eigen::Matrix<float, 3, 1>(t.rol_ddot, t.pit_ddot, t.yaw_ddot);
           host_data->last_gimbal_time_ = LibXR::Timebase::GetMilliseconds();
           host_data->HostCMD(in_isr);
         },
@@ -141,7 +142,6 @@ class HostData : public LibXR::Application {
       host_cmd.gimbal.yaw_dot = host_gyro_.z();
       host_cmd.gimbal.yaw_ddot = host_accl_.z();
       host_cmd.gimbal_online = true;
-
     }
 
     host_cmd.launcher.isfire = host_fire_notify_.isfire;
@@ -161,8 +161,8 @@ class HostData : public LibXR::Application {
   LauncherCMD host_fire_notify_;
 
   LibXR::EulerAngle<float> host_euler_;
-  Eigen::Matrix<float, 3, 1> host_gyro_ = {0,0,0};
-  Eigen::Matrix<float, 3, 1> host_accl_ = {0,0,0};
+  Eigen::Matrix<float, 3, 1> host_gyro_ = {0, 0, 0};
+  Eigen::Matrix<float, 3, 1> host_accl_ = {0, 0, 0};
 
   LibXR::Topic host_gimbal_data_tp_;
   LibXR::Topic host_chassis_data_tp_;
@@ -171,5 +171,4 @@ class HostData : public LibXR::Application {
   LibXR::MillisecondTimestamp last_chassis_time_ = 0;
   LibXR::MillisecondTimestamp last_gimbal_time_ = 0;
   LibXR::MillisecondTimestamp last_fire_time_ = 0;
-
 };
