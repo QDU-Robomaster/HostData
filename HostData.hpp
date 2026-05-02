@@ -72,7 +72,7 @@ class HostData : public LibXR::Application {
             LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
     UNUSED(hw);
 
-    auto euler_callback = LibXR::Callback<LibXR::RawData&>::Create(
+    auto euler_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           HostGimbalTarget t;
           LibXR::Memory::FastCopy(&t, raw_data.addr_, sizeof(t));
@@ -87,7 +87,7 @@ class HostData : public LibXR::Application {
         },
         this);
 
-    auto chassis_callback = LibXR::Callback<LibXR::RawData&>::Create(
+    auto chassis_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           LibXR::Memory::FastCopy(&host_data->host_chassis_data_,
                                   raw_data.addr_, sizeof(HostChassisTarget));
@@ -96,7 +96,7 @@ class HostData : public LibXR::Application {
         },
         this);
 
-    auto fire_callback = LibXR::Callback<LibXR::RawData&>::Create(
+    auto fire_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
           LibXR::Memory::FastCopy(&host_data->host_fire_notify_, raw_data.addr_,
                                   sizeof(LauncherCMD));
