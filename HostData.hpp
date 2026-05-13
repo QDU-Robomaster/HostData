@@ -131,13 +131,17 @@ class HostData : public LibXR::Application {
       host_cmd.chassis_online = true;
     }
 
-    if (host_euler_.Pitch() == 0.0f && host_euler_.Yaw() == 0.0f) {
+    if (host_euler_.Roll() == 0.0f && host_euler_.Pitch() == 0.0f &&
+        host_euler_.Yaw() == 0.0f) {
       host_cmd.gimbal = {0, 0, 0, 0, 0, 0, 0, 0, 0};
       host_cmd.gimbal_online = false;
     } else {
+      host_cmd.gimbal.rol = host_euler_.Roll();
       host_cmd.gimbal.pit = host_euler_.Pitch();
       host_cmd.gimbal.yaw = host_euler_.Yaw();
+      host_cmd.gimbal.rol_dot = host_gyro_.x();
       host_cmd.gimbal.pit_dot = host_gyro_.y();
+      host_cmd.gimbal.rol_ddot = host_accl_.x();
       host_cmd.gimbal.pit_ddot = host_accl_.y();
       host_cmd.gimbal.yaw_dot = host_gyro_.z();
       host_cmd.gimbal.yaw_ddot = host_accl_.z();
