@@ -4,13 +4,14 @@
 /* === MODULE MANIFEST V2 ===
 module_description: No description provided
 constructor_args:
-  - cmd: '@cmd'
+  - cmd: '@nullptr'
   - host_euler_topic_name: "target_eulr"
   - host_chassis_data_topic_name: "host_chassis_data"
   - host_fire_topic_name: "host_fire_notify"
 template_args: []
 required_hardware: []
-depends: []
+depends:
+  - qdu-future/CMD
 === END MANIFEST === */
 // clang-format on
 
@@ -60,20 +61,27 @@ class HostData : public LibXR::Application {
    * @param host_fire_topic_name 发射控制 Topic
    */
   HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
-           CMD& cmd, const char* host_gimbal_topic_name,
+           CMD* cmd, const char* host_gimbal_topic_name,
            const char* host_chassis_data_topic_name,
            const char* host_fire_topic_name)
-      : cmd_(&cmd),
-        host_gimbal_data_tp_(LibXR::Topic::CreateTopic<HostGimbalTarget>(
-            host_gimbal_topic_name)),
-        host_chassis_data_tp_(LibXR::Topic::CreateTopic<HostChassisTarget>(
-            host_chassis_data_topic_name)),
-        host_fire_notify_tp_(
-            LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name)) {
+      : cmd_(cmd) {
     UNUSED(hw);
+
+    ASSERT(cmd_ != nullptr);
+
+    host_gimbal_data_tp_ = LibXR::Topic::CreateTopic<HostGimbalTarget>(
+        host_gimbal_topic_name);
+    host_chassis_data_tp_ = LibXR::Topic::CreateTopic<HostChassisTarget>(
+        host_chassis_data_topic_name);
+    host_fire_notify_tp_ =
+        LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name);
 
     auto euler_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
+          if (host_data == nullptr || raw_data.addr_ == nullptr ||
+              raw_data.size_ < sizeof(HostGimbalTarget)) {
+            return;
+          }
           HostGimbalTarget t;
           LibXR::Memory::FastCopy(&t, raw_data.addr_, sizeof(t));
           host_data->host_euler_ =
@@ -89,6 +97,10 @@ class HostData : public LibXR::Application {
 
     auto chassis_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
+          if (host_data == nullptr || raw_data.addr_ == nullptr ||
+              raw_data.size_ < sizeof(HostChassisTarget)) {
+            return;
+          }
           LibXR::Memory::FastCopy(&host_data->host_chassis_data_,
                                   raw_data.addr_, sizeof(HostChassisTarget));
           host_data->last_chassis_time_ = LibXR::Timebase::GetMilliseconds();
@@ -98,6 +110,10 @@ class HostData : public LibXR::Application {
 
     auto fire_callback = LibXR::Topic::Callback::Create(
         [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data) {
+          if (host_data == nullptr || raw_data.addr_ == nullptr ||
+              raw_data.size_ < sizeof(LauncherCMD)) {
+            return;
+          }
           LibXR::Memory::FastCopy(&host_data->host_fire_notify_, raw_data.addr_,
                                   sizeof(LauncherCMD));
           host_data->last_fire_time_ = LibXR::Timebase::GetMilliseconds();
@@ -111,6 +127,13 @@ class HostData : public LibXR::Application {
 
     app.Register(*this);
   }
+
+  HostData(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
+           CMD& cmd, const char* host_gimbal_topic_name,
+           const char* host_chassis_data_topic_name,
+           const char* host_fire_topic_name)
+      : HostData(hw, app, &cmd, host_gimbal_topic_name,
+                 host_chassis_data_topic_name, host_fire_topic_name) {}
 
   /**
    * @brief 汇总并下发 Host 命令
