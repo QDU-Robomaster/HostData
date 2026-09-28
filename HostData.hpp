@@ -148,11 +148,6 @@ class HostData
     cmd_->FeedAI(host_cmd);
   }
 
-  /**
-   * @brief 监控回调
-   */
-  void OnMonitor() {}
-
  private:
   CMD* cmd_;
   HostChassisTarget host_chassis_data_;

@@ -6,7 +6,6 @@
 ## 2. 主要函数说明
 1. HostCMD: 汇总云台/底盘/发射数据并喂给 CMD。
 2. 构造函数中的三个 Topic 回调: 接收 euler、chassis、fire 数据。
-3. OnMonitor: 监控钩子（当前为空实现）。
 
 ## 3. 接入步骤
 1. 添加模块并配置 host 侧 Topic 名称。
