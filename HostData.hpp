@@ -68,10 +68,8 @@ class HostData
         host_fire_notify_tp_(LibXR::Topic::CreateTopic<LauncherCMD>(host_fire_topic_name))
   {
     auto euler_callback = LibXR::Topic::Callback::Create(
-        [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data)
+        [](bool in_isr, HostData* host_data, const HostGimbalTarget& t)
         {
-          HostGimbalTarget t;
-          LibXR::Memory::FastCopy(&t, raw_data.addr_, sizeof(t));
           host_data->host_euler_ = LibXR::EulerAngle<float>(t.rol, t.pit, t.yaw);
           host_data->host_gyro_ =
               Eigen::Matrix<float, 3, 1>(t.rol_dot, t.pit_dot, t.yaw_dot);
@@ -83,20 +81,18 @@ class HostData
         this);
 
     auto chassis_callback = LibXR::Topic::Callback::Create(
-        [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data)
+        [](bool in_isr, HostData* host_data, const HostChassisTarget& chassis)
         {
-          LibXR::Memory::FastCopy(&host_data->host_chassis_data_, raw_data.addr_,
-                                  sizeof(HostChassisTarget));
+          host_data->host_chassis_data_ = chassis;
           host_data->last_chassis_time_ = LibXR::Timebase::GetMilliseconds();
           host_data->HostCMD(in_isr);
         },
         this);
 
     auto fire_callback = LibXR::Topic::Callback::Create(
-        [](bool in_isr, HostData* host_data, LibXR::RawData& raw_data)
+        [](bool in_isr, HostData* host_data, const LauncherCMD& fire)
         {
-          LibXR::Memory::FastCopy(&host_data->host_fire_notify_, raw_data.addr_,
-                                  sizeof(LauncherCMD));
+          host_data->host_fire_notify_ = fire;
           host_data->last_fire_time_ = LibXR::Timebase::GetMilliseconds();
           host_data->HostCMD(in_isr);
         },
