@@ -23,37 +23,65 @@ depends:
 #include "transform.hpp"
 
 /**
- * @brief 上位机数据接入模块
- * @details 将上位机发送的云台、底盘、发射命令转换为 CMD::Data，通过 CMD 的 AI 控制入口提交。
+ * @brief 上位机数据接入模块：把上位机发来的云台目标、底盘速度和发射命令汇总为
+ *        `CMD::Data`，通过 CMD 的 AI 控制入口提交。
+ *        Host data Module that combines the gimbal target, chassis speed and fire command
+ *        from the host into `CMD::Data` and submits it through the AI control entry of
+ *        CMD.
  */
 class HostData
 {
  public:
+  /**
+   * @brief 上位机给出的底盘目标速度。
+   *        Chassis target speed from the host.
+   */
   struct HostChassisTarget
   {
-    float vx;
-    float vy;
-    float w;
-  };
-
-  struct LauncherCMD
-  {
-    bool isfire;
-  };
-
-  struct HostGimbalTarget
-  {
-    float rol, pit, yaw;
-    float rol_dot, pit_dot, yaw_dot;
-    float rol_ddot, pit_ddot, yaw_ddot;
+    float vx;  ///< x 方向速度 Velocity along x
+    float vy;  ///< y 方向速度 Velocity along y
+    float w;   ///< 旋转角速度 Rotation angular velocity
   };
 
   /**
-   * @brief 构造 HostData 模块
-   * @param cmd CMD 模块引用
-   * @param host_gimbal_topic_name 云台目标欧拉角 Topic
-   * @param host_chassis_data_topic_name 底盘目标速度 Topic
-   * @param host_fire_topic_name 发射控制 Topic
+   * @brief 上位机给出的发射命令。
+   *        Fire command from the host.
+   */
+  struct LauncherCMD
+  {
+    bool isfire;  ///< 是否开火 Whether to fire
+  };
+
+  /**
+   * @brief 上位机给出的云台目标欧拉角及其一阶、二阶导数。
+   *        Gimbal target Euler angles from the host with their first and second
+   *        derivatives.
+   */
+  struct HostGimbalTarget
+  {
+    float rol;       ///< 目标 roll Target roll
+    float pit;       ///< 目标 pitch Target pitch
+    float yaw;       ///< 目标 yaw Target yaw
+    float rol_dot;   ///< roll 一阶导数 First derivative of roll
+    float pit_dot;   ///< pitch 一阶导数 First derivative of pitch
+    float yaw_dot;   ///< yaw 一阶导数 First derivative of yaw
+    float rol_ddot;  ///< roll 二阶导数 Second derivative of roll
+    float pit_ddot;  ///< pitch 二阶导数 Second derivative of pitch
+    float yaw_ddot;  ///< yaw 二阶导数 Second derivative of yaw
+  };
+
+  /**
+   * @brief 构造 HostData，创建三个 Topic 并注册回调。
+   *        Construct HostData, create the three Topics and register the callbacks.
+   *
+   * @param cmd CMD 实例，接收 AI 控制数据。
+   *            CMD instance that receives the AI control data.
+   * @param host_gimbal_topic_name 云台目标 Topic 名称。
+   *                               Name of the gimbal target Topic.
+   * @param host_chassis_data_topic_name 底盘目标速度 Topic 名称。
+   *                                     Name of the chassis target speed Topic.
+   * @param host_fire_topic_name 发射命令 Topic 名称。
+   *                             Name of the fire command Topic.
    */
   HostData(
       CMD& cmd,
@@ -104,8 +132,12 @@ class HostData
   }
 
   /**
-   * @brief 汇总并下发 Host 命令
-   * @param in_isr 是否在中断上下文（当前未使用）
+   * @brief 用三路最新数据组成一帧 `CMD::Data` 并调用 `cmd.FeedAI()`。
+   *        Compose one `CMD::Data` frame from the latest data of the three Topics and
+   *        call `cmd.FeedAI()`.
+   *
+   * @param in_isr 是否在中断上下文。
+   *               Whether called from interrupt context.
    */
   void HostCMD(bool in_isr)
   {
