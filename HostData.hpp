@@ -83,11 +83,9 @@ class HostData
    * @param host_fire_topic_name 发射命令 Topic 名称。
    *                             Name of the fire command Topic.
    */
-  HostData(
-      CMD& cmd,
-      const char* host_gimbal_topic_name = "target_euler",
-      const char* host_chassis_data_topic_name = "host_chassis_data",
-      const char* host_fire_topic_name = "host_fire_notify")
+  HostData(CMD& cmd, const char* host_gimbal_topic_name = "target_euler",
+           const char* host_chassis_data_topic_name = "host_chassis_data",
+           const char* host_fire_topic_name = "host_fire_notify")
       : cmd_(&cmd),
         host_gimbal_data_tp_(
             LibXR::Topic::CreateTopic<HostGimbalTarget>(host_gimbal_topic_name)),
