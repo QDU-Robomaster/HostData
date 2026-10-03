@@ -2,7 +2,7 @@
 
 // clang-format off
 /* === MODULE MANIFEST V2 ===
-module_description: No description provided
+module_description: 上位机数据接入模块：把上位机发来的云台目标、底盘速度和发射命令汇总为 CMD 的 AI 控制数据 / Host data Module that combines the gimbal target, chassis speed and fire command from the host into AI control data for CMD
 depends:
 - id: QDU-Robomaster/CMD
   ref: same-or-dev
@@ -24,7 +24,7 @@ depends:
 
 /**
  * @brief 上位机数据接入模块
- * @details 将上位机发送的云台、底盘、发射命令转换为 CMD::Data 并喂给 CMD 模块。
+ * @details 将上位机发送的云台、底盘、发射命令转换为 CMD::Data，通过 CMD 的 AI 控制入口提交。
  */
 class HostData
 {
@@ -51,7 +51,7 @@ class HostData
   /**
    * @brief 构造 HostData 模块
    * @param cmd CMD 模块引用
-   * @param host_euler_topic_name 云台目标欧拉角 Topic
+   * @param host_gimbal_topic_name 云台目标欧拉角 Topic
    * @param host_chassis_data_topic_name 底盘目标速度 Topic
    * @param host_fire_topic_name 发射控制 Topic
    */
